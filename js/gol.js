@@ -1,246 +1,174 @@
-var width = 1100;
-var height = 450;
-var container, stats;
-var canvas, camera, scene, projector, renderer;
-var particleMaterial;
+var canvasWidth = 1120;
+var canvasHeight = 460;
+var canvas = document.getElementById("mainCanvas");
 
-var period = 1000/10;
+var period = 1000/60;
 
+var grid = new Array();
+var cellRadius = 10;
 var cells = new Array();
+var cellSymbol;
 var rows = 0, columns = 0;
+var loop;
 
-window.onload = function(){
-	initScene();
-	init();
-	setInterval(runLoop, period);
-}
+paper.install(window);
 
-function initScene(){
-	$container = $("#mainCanvas");
+var tool = new Tool();
 
-	camera = new THREE.OrthographicCamera( width / - 2, width / 2, height / 2, height / - 2, -2000, 1000 );
-	camera.position.set(0,0,100);
-
-	scene = new THREE.Scene();
-	scene.add( camera );
-
-	projector = new THREE.Projector();
-
-	renderer = new THREE.WebGLRenderer();
-	renderer.setSize( width, height);
-
-	canvas = renderer.domElement;
-	canvas.onmousemove = onMouseDown;
-
-	$container.append( canvas );
-}
-
-function init() {
-	
-	console.log(toWorldPos(0, 0));
-	console.log(toWorldPos(width/2, height/2));
-
-	var scale = 20;
-	var i, j;
-
-	cells = new Array(Math.ceil(height/scale));
-
-	for (  i = 0; i <= height; i += scale )
-	{
-		cells[i/scale] = new Array(Math.ceil(width/ scale));
-
-		for ( j = 0; j <= width; j += scale ) 
-		{					
-			var object = drawSquare(scale);	
-			var pos = toWorldPos(j, i);	
-			object.position.set(pos.x, pos.y ,0);	
-			
-			var x = i/scale, y = j/scale;
-			var cell = new Cell(object, x, y);
-			cells[x][y] = cell;
-			object.cell = cell;
-
-			scene.add(object);
-
-		}			
-	}
-
-	rows = i/scale;
-	columns = j/scale;
-
-}
-
-function Cell(mesh, i, j)
+window.onload = function()
 {
-	this.mesh = mesh;
-	this.i = i;
-	this.j = j;
+	paper.setup("mainCanvas");
 
-	this.isAlive = false;
+	init();
 
-	this.revive = function(){
-		this.isAlive = true;
-	}
-
-	this.kill = function(){
-		this.isAlive = false;
-	}
+	loop = setInterval(runLoop, period);
 }
 
-drawSquare = function(scale){
-
-	scale = scale || 10; //Default scale of 10 units.
-
-	var geometry = new THREE.CubeGeometry( scale, scale, scale);
-
-	/*
-	var geometry = new THREE.Geometry();
-	geometry.vertices.push( new THREE.Vector3( -scale,  scale, 0 ) );
-	geometry.vertices.push( new THREE.Vector3( -scale, -scale, 0 ) );
-	geometry.vertices.push( new THREE.Vector3(  scale, -scale, 0 ) );
-	geometry.vertices.push( new THREE.Vector3(  scale,  scale, 0 ) );
-
-	geometry.faces.push( new THREE.Face4( 0, 1, 2, 3 ) );
-	//geometry.faces.push( new THREE.Face3( 2, 3, 0 ) );
-	geometry.computeFaceNormals();
-	*/
-
-	return new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({color: 0xffffff, opacity: 0}));				
-}
-
-onMouseDown = function( event ) {
-
-	event.preventDefault();
-
-	//var x = event.clientX - $(canvas).offset().left;
-	//var y = event.clientY - $(canvas).offset().top;
-
-	var object = getObjectAtPos(event.clientX, event.clientY);
-	//var object = getObjectAtPos(x, y);
-
-	if ( object ) {
-		//object.material.color.setHex(0x000000);
-		object.cell.revive();
-		object.cell.mesh.material.opacity = 1;
-		object.cell.isAlive = true;
-		console.log(object.cell);
-		//console.log(object.cell);
-		//console.log('Hovered over ('+object.cell.i+', '+object.cell.j+')');
-	}	
-}
-
-toScreenPos = function(positionVector){
-	var pos = positionVector.clone();
-
-	projector.projectVector(pos, camera);
-
-	return {
-		x: (  pos.x + 1 ) * width / 2 + $(canvas).offset().left + window.pageXOffset,
-		y: ( -pos.y + 1 ) * height / 2 + $(canvas).offset().top + window.pageYOffset
-	};
-}
-
-toWorldPos = function(x, y){
-
-	// Convert to Normalized Device Cooordinates (NDC)
-	x =  ( x / width ) * 2 - 1;
-	y = -( y / height ) * 2 + 1;	
-
-	var vector = new THREE.Vector3( x, y, -1 );
-	projector.unprojectVector( vector, camera );
-
-	return vector;
-}
-
-getObjectAtPos = function(x, y){
-
-	x -= $(canvas).offset().left - window.pageXOffset;
-	y -= $(canvas).offset().top - window.pageYOffset;
-
-	x =  ( x / width ) * 2 - 1;
-	y = -( y / height ) * 2 + 1;	
-
-	var vecOrigin = new THREE.Vector3( x, y,  -1 );
-	var vecTarget = new THREE.Vector3( x, y,  1 );
-
-	projector.unprojectVector( vecOrigin, camera );
-	projector.unprojectVector( vecTarget, camera );
-
-	vecTarget.subSelf( vecOrigin ).normalize();
-
-	var ray = new THREE.Ray(vecOrigin, vecTarget);
-	var intersects = ray.intersectObjects( scene.children );
-
-	if(intersects.length > 0)
-		return intersects[0].object;
-	return undefined;
-}
-
-function runLoop() {
-
+function runLoop()
+{
 	update();
-	render();
+	view.draw();	
 }
 
-function update() {
+function init()
+{
+	var rectangle = new Rectangle(new Point(0, 0), new Point(cellRadius*2, cellRadius*2));
+	var cellShape = new Path.Rectangle(rectangle);
+	
+	cellShape.fillColor = 'white';
+	cellSymbol = new Symbol(cellShape);
+
+	rows = canvasHeight / (cellRadius*2);
+	columns = canvasWidth / (cellRadius*2);
+
+	grid = new Array(rows);
+	for(var i=0; i<=rows; i++){
+		grid[i] = new Array(columns);
+		for(var j=0; j<=columns; j++){
+			var cell = new Cell(new Point(j, i));
+			grid[i][j] = cell;
+		}
+	}
+
+	console.log('r: '+rows+' | c: '+columns);
+}
+
+var isDown = false;
+
+canvas.onmousedown = function(event){
+	clearInterval(loop);
+	isDown = true;
+}
+
+canvas.onmouseup = function(event){
+	loop = setInterval(runLoop, period);	
+	isDown = false;
+}
+
+canvas.onmousemove = function(event) {
+
+	if(isDown){
+		x = event.clientX - 120;
+		y = event.clientY - canvas.offsetTop;
+
+		var location = new Point();
+		location.x = x - (x % (cellRadius*2));
+		location.y = y - (y % (cellRadius*2));
+		location.x /= (cellRadius*2);
+		location.y /= (cellRadius*2);
+
+	    var cell = grid[location.y][location.x];
+	    if(!cell.isAlive) cell.create();	
+	    view.draw();	
+	}
+
+}
+
+function update()
+{
 
 	for(var i=0; i<rows; i++){
-
 		for(var j=0; j<columns; j++){
 
-			var cell = cells[i][j];
+			var cell = grid[i][j];
 			var aliveNeighbours = 0;
+
 
 			var upper = (i == 0) ? rows - 1: i - 1;
 			var lower = (i == rows - 1) ? 0 : i + 1;
 			var left = (j == 0) ? columns - 1 : j - 1;
 			var right = (j == columns - 1) ? 0 : j + 1;
 
-			if(cells[upper][left].isAlive) aliveNeighbours++;
-			if(cells[i][left].isAlive) aliveNeighbours++;
-			if(cells[lower][left].isAlive) aliveNeighbours++;
+			if(grid[upper][left].isAlive) aliveNeighbours++;
+			if(grid[i][left].isAlive) aliveNeighbours++;
+			if(grid[lower][left].isAlive) aliveNeighbours++;
 
-			if(cells[upper][j].isAlive) aliveNeighbours++;
-			if(cells[lower][j].isAlive) aliveNeighbours++;
+			if(grid[upper][j].isAlive) aliveNeighbours++;
+			if(grid[lower][j].isAlive) aliveNeighbours++;
 
-			if(cells[upper][right].isAlive) aliveNeighbours++;
-			if(cells[i][right].isAlive) aliveNeighbours++;
-			if(cells[lower][right].isAlive) aliveNeighbours++;
-
-			if(aliveNeighbours > 0){
-				console.log('Alive Neighbours: '+aliveNeighbours);
-			}
+			if(grid[upper][right].isAlive) aliveNeighbours++;
+			if(grid[i][right].isAlive) aliveNeighbours++;
+			if(grid[lower][right].isAlive) aliveNeighbours++;
 
 
 			if(cell.isAlive){
 
 				if(aliveNeighbours < 2 || aliveNeighbours > 3){
-					cell.kill();
+					cell.destroy();
 				}					
 			}
 			else{
 
 				if(aliveNeighbours == 3)
-					cell.revive();
+					cell.create();
+					
 			}
-
-			if(cell.isAlive){
-
-				cell.mesh.material.opacity = 1;	
-				console.log('Setting Alive');
-			}					
-			else{
-				cell.mesh.material.opacity = 0;	
-			}
-
 		}
 	}
 }
 
-function render() {
 
-	camera.lookAt( scene.position );
-	renderer.render( scene, camera );
+function Cell(location)
+{
+	this.shape = undefined;
+	this.location = location;
+
+	var states = {
+		dead: 0,
+		reviving : 1,
+		alive: 2,
+		dying: 3
+	};
+
+	this.state = states.dead;
+	this.isAlive = undefined;
+
+	this.create = function()
+	{
+		this.shape = cellSymbol.place(this.location.multiply(cellRadius*2));
+
+		this.state = states.alive;
+		this.isAlive = true;
+	}
+
+	this.destroy = function()
+	{
+		this.shape.remove();
+		this.state = states.dead;
+		this.isAlive = false;
+
+	}
+
+	this.kill = function(){
+		this.state = states.dying;
+	}
+
+	this.revive = function(){
+		this.state = states.reviving;
+	}
+
+	this.render = function()
+	{
+
+	}
 }
-
-
