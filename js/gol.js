@@ -2,10 +2,11 @@ var canvasWidth = 1120;
 var canvasHeight = 460;
 var canvas = document.getElementById("mainCanvas");
 
-var period = 1000/60;
+var period = 1000/20;
 
 var grid = new Array();
-var cellRadius = 10;
+var status_grid = new Array();
+var cellRadius = 2;
 var cells = new Array();
 var cellSymbol;
 var rows = 0, columns = 0;
@@ -42,11 +43,14 @@ function init()
 	columns = canvasWidth / (cellRadius*2);
 
 	grid = new Array(rows);
+	status_grid = new Array(rows);
 	for(var i=0; i<=rows; i++){
 		grid[i] = new Array(columns);
+		status_grid[i] = new Array(columns);
 		for(var j=0; j<=columns; j++){
 			var cell = new Cell(new Point(j, i));
 			grid[i][j] = cell;
+			status_grid[i][j] = 0;
 		}
 	}
 
@@ -78,7 +82,10 @@ canvas.onmousemove = function(event) {
 		location.y /= (cellRadius*2);
 
 	    var cell = grid[location.y][location.x];
-	    if(!cell.isAlive) cell.create();	
+	    if(!cell.status){
+			cell.create();
+			status_grid[location.y][location.x] = 1;
+		}	
 	    view.draw();	
 	}
 
@@ -86,43 +93,54 @@ canvas.onmousemove = function(event) {
 
 function update()
 {
-
+	ts_grid = new Array(rows);
 	for(var i=0; i<rows; i++){
+		ts_grid[i] = new Array(columns);
 		for(var j=0; j<columns; j++){
 
+			ts_grid[i][j] = status_grid[i][j];
 			var cell = grid[i][j];
 			var aliveNeighbours = 0;
-
 
 			var upper = (i == 0) ? rows - 1: i - 1;
 			var lower = (i == rows - 1) ? 0 : i + 1;
 			var left = (j == 0) ? columns - 1 : j - 1;
 			var right = (j == columns - 1) ? 0 : j + 1;
 
-			if(grid[upper][left].isAlive) aliveNeighbours++;
-			if(grid[i][left].isAlive) aliveNeighbours++;
-			if(grid[lower][left].isAlive) aliveNeighbours++;
 
-			if(grid[upper][j].isAlive) aliveNeighbours++;
-			if(grid[lower][j].isAlive) aliveNeighbours++;
+			aliveNeighbours += (
+				status_grid[upper][left]+
+				status_grid[i][left]+
+				status_grid[lower][left]+
+				status_grid[upper][j]+
+				status_grid[lower][j]+
+				status_grid[upper][right]+
+				status_grid[i][right]+
+				status_grid[lower][right]);				
 
-			if(grid[upper][right].isAlive) aliveNeighbours++;
-			if(grid[i][right].isAlive) aliveNeighbours++;
-			if(grid[lower][right].isAlive) aliveNeighbours++;
+			if(cell.status == 1){
 
-
-			if(cell.isAlive){
-
-				if(aliveNeighbours < 2 || aliveNeighbours > 3){
+				if(aliveNeighbours != 2 && aliveNeighbours != 3){
 					cell.destroy();
+					ts_grid[i][j] = 0;
 				}					
 			}
 			else{
 
-				if(aliveNeighbours == 3)
+				if(aliveNeighbours == 3){
 					cell.create();
+					ts_grid[i][j] = 1;
+				}
 					
 			}
+		}
+	}
+
+	status_grid = new Array(rows);
+	for(var i=0; i<rows; i++){
+		status_grid[i] = new Array(columns);
+		for(var j=0; j<columns; j++){
+			status_grid[i][j] = ts_grid[i][j];
 		}
 	}
 }
@@ -132,33 +150,22 @@ function Cell(location)
 {
 	this.shape = undefined;
 	this.location = location;
-
-	var states = {
-		dead: 0,
-		reviving : 1,
-		alive: 2,
-		dying: 3
-	};
-
-	this.state = states.dead;
-	this.isAlive = undefined;
+	this.status = 0;
 
 	this.create = function()
 	{
 		this.shape = cellSymbol.place(this.location.multiply(cellRadius*2));
-
-		this.state = states.alive;
-		this.isAlive = true;
+		this.status = 1;
 	}
 
 	this.destroy = function()
 	{
 		this.shape.remove();
-		this.state = states.dead;
-		this.isAlive = false;
+		this.status = 0;
 
 	}
 
+/*
 	this.kill = function(){
 		this.state = states.dying;
 	}
@@ -171,4 +178,5 @@ function Cell(location)
 	{
 
 	}
+*/
 }
