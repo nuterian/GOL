@@ -23,6 +23,20 @@ window.onload = function()
 	init();
 
 	loop = setInterval(runLoop, period);
+
+	$("#reset").click(function(){
+		clearInterval(loop);
+
+		for(var i=0; i<rows; i++){
+			for(var j=0; j<columns; j++){
+				if(grid[i][j].status == 1){
+					grid[i][j].destroy();
+					status_grid[i][j] = 0;
+				}
+			}
+		}
+		view.draw();
+	});
 }
 
 function runLoop()
@@ -164,19 +178,4 @@ function Cell(location)
 		this.status = 0;
 
 	}
-
-/*
-	this.kill = function(){
-		this.state = states.dying;
-	}
-
-	this.revive = function(){
-		this.state = states.reviving;
-	}
-
-	this.render = function()
-	{
-
-	}
-*/
 }
