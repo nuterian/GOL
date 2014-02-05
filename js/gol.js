@@ -1,4 +1,4 @@
-var canvasWidth = 1120;
+var canvasWidth = 960;
 var canvasHeight = 460;
 var canvas = document.getElementById("mainCanvas");
 
@@ -67,8 +67,6 @@ function init()
 			status_grid[i][j] = 0;
 		}
 	}
-
-	console.log('r: '+rows+' | c: '+columns);
 }
 
 var isDown = false;
@@ -86,7 +84,7 @@ canvas.onmouseup = function(event){
 canvas.onmousemove = function(event) {
 
 	if(isDown){
-		x = event.clientX - 120;
+		x = event.clientX - canvas.offsetLeft;
 		y = event.clientY - canvas.offsetTop;
 
 		var location = new Point();
